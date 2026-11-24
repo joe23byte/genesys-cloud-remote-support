@@ -121,15 +121,39 @@ npm run dev
 Danach `http://localhost:3000` öffnen. `npm run dev` startet den Server mit Vite-Hot-Reload.
 Ohne `AGENT_ACCOUNTS` wird automatisch ein Entwicklungskonto **`demo`** angelegt. Das Passwort steht in der Konsole (`dev_agent_account_created`). Ein festes Passwort setzen Sie mit `DEV_AGENT_PASSWORD=...` in `.env`.
 
-**Eigene Testkonten (empfohlen, in Produktion Pflicht):**
+### Agent-Konten anlegen (`AGENT_ACCOUNTS`)
+
+`AGENT_ACCOUNTS` ist die Liste der Agenten, die sich im Widget anmelden dürfen. In Produktion (z. B. auf Render) startet die Anwendung ohne diese Variable nicht. Die Konten sind bewusst unabhängig von Genesys-Benutzern; der Benutzername darf aber gleich lauten.
+
+**Schritt 1 – pro Agent einen Eintrag erzeugen** (lokal im Projektordner):
 
 ```bash
 npm run agent:create -- anna "Anna Agent"
-# Passwort wird verdeckt abgefragt (mind. 10 Zeichen); ausgegeben wird nur der scrypt-Hash:
-# anna|Anna Agent|scrypt:16384:8:1:...:...
 ```
 
-Mehrere Einträge werden mit `;` getrennt in `AGENT_ACCOUNTS` eingetragen.
+- `anna` ist der Benutzername für den Login (2–64 Zeichen: Buchstaben, Ziffern, `.` `_` `@` `-`).
+- `"Anna Agent"` ist der Name, den Agent und Kunde angezeigt bekommen.
+- Das Skript fragt zweimal verdeckt nach einem Passwort (mindestens 10 Zeichen).
+
+Ausgegeben wird **eine Zeile**: Benutzername, Anzeigename und ein Hash des Passworts, getrennt durch `|`. Das Passwort selbst wird nirgends gespeichert.
+
+```text
+anna|Anna Agent|scrypt:16384:8:1:Xy3kQ...:9fQ2a...
+```
+
+**Schritt 2 – die Zeile als Wert von `AGENT_ACCOUNTS` eintragen**
+
+- Lokal in `.env`: `AGENT_ACCOUNTS=anna|Anna Agent|scrypt:16384:8:1:Xy3kQ...:9fQ2a...`
+- Auf Render: *Environment → AGENT_ACCOUNTS* → die Zeile als Wert einfügen → *Save Changes* (Render startet neu).
+
+**Schritt 3 – mehrere Agenten:** Das Skript pro Agent ausführen und die Zeilen mit einem **Semikolon `;`** hintereinander setzen:
+
+```text
+AGENT_ACCOUNTS=anna|Anna Agent|scrypt:...;ben|Ben Agent|scrypt:...
+```
+
+**Anmelden:** Im Widget bzw. auf `/demo` gibt Anna den Benutzernamen `anna` und ihr gewähltes Passwort ein.
+**Passwort ändern oder Agent entfernen:** neue Zeile erzeugen bzw. Zeile löschen, `AGENT_ACCOUNTS` aktualisieren, neu starten.
 
 **Produktionsbuild lokal:**
 
@@ -188,7 +212,7 @@ Render unterstützt WebSockets und terminiert TLS. Die Anwendung erkennt `RENDER
 
    | Variable | Wert |
    | --- | --- |
-   | `AGENT_ACCOUNTS` | **Pflicht.** Ausgabe von `npm run agent:create`, mehrere mit `;` |
+   | `AGENT_ACCOUNTS` | **Pflicht.** Die Login-Konten der Agenten, siehe [Agent-Konten anlegen](#agent-konten-anlegen-agent_accounts) |
    | `PUBLIC_BASE_URL` | leer lassen (dann `https://<name>.onrender.com`) oder eigene Domain, z. B. `https://support.example.com` |
    | `GC_ALLOWED_HOST_ORIGINS` | leer = alle öffentlichen Genesys-Regionen. Empfohlen: nur Ihre Region, z. B. `https://apps.mypurecloud.de` |
    | `FRAME_ANCESTORS_EXTRA` | leer (später z. B. Salesforce) |
