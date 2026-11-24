@@ -1,0 +1,65 @@
+# Remote Support for Genesys Cloud
+#
+#   Local (http://localhost:3000, development mode, no TLS):
+#     docker compose up --build
+#
+#   Server with a public domain (automatic HTTPS via Caddy + optional coturn):
+#     set PUBLIC_DOMAIN, NODE_ENV=production, PUBLIC_BASE_URL etc. in .env, then
+#     docker compose --profile https --profile turn up -d --build
+#
+# All settings are read from .env (see .env.example). Values containing "$"
+# must be written as "$$" here, but in .env they can be used verbatim.
+
+services:
+  app:
+    build: .
+    image: gc-remote-support:latest
+    restart: unless-stopped
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      PORT: 3000
+      DATABASE_PATH: /data/remote-support.sqlite
+    ports:
+      - "${APP_PORT:-3000}:3000"
+    volumes:
+      - app-data:/data
+
+  # Reverse proxy with automatic Let's Encrypt certificates (WebSockets are proxied transparently).
+  caddy:
+    image: caddy:2-alpine
+    profiles: ["https"]
+    restart: unless-stopped
+    depends_on: [app]
+    environment:
+      PUBLIC_DOMAIN: ${PUBLIC_DOMAIN:-localhost}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+
+  # TURN relay for customers behind restrictive NAT/firewalls. Uses host networking because
+  # TURN needs a large UDP relay port range (Linux hosts only; on macOS/Windows use a VM).
+  coturn:
+    image: coturn/coturn:4.6
+    profiles: ["turn"]
+    restart: unless-stopped
+    network_mode: host
+    command:
+      - -c
+      - /etc/coturn/turnserver.conf
+      - --static-auth-secret=${TURN_SECRET:?TURN_SECRET must be set for the turn profile}
+      - --realm=${TURN_REALM:-remote-support}
+      - --external-ip=${TURN_EXTERNAL_IP:?TURN_EXTERNAL_IP (public IPv4 of this host) must be set}
+    volumes:
+      - ./deploy/coturn/turnserver.conf:/etc/coturn/turnserver.conf:ro
+
+volumes:
+  app-data:
+  caddy-data:
+  caddy-config:

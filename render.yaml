@@ -1,0 +1,64 @@
+# Render Blueprint – Remote Support for Genesys Cloud
+# Dashboard: New > Blueprint > select this repository. Values marked "sync: false"
+# are requested once in the dashboard and never stored in the repository.
+#
+# Important: run exactly ONE instance. Live session state and Socket.IO rooms are
+# kept in memory and SQLite lives on the attached disk (no horizontal scaling).
+
+services:
+  - type: web
+    name: gc-remote-support
+    runtime: node
+    # A persistent disk requires a paid plan. On "free" remove the disk block and set
+    # DATABASE_PATH to /tmp/remote-support.sqlite (metadata is lost on every restart/deploy).
+    plan: starter
+    region: frankfurt
+    numInstances: 1
+    buildCommand: npm ci --include=dev && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/health
+    autoDeploy: true
+    disk:
+      name: remote-support-data
+      mountPath: /var/data
+      sizeGB: 1
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: "24"
+      # PUBLIC_BASE_URL defaults to RENDER_EXTERNAL_URL (https://<name>.onrender.com).
+      # Set it explicitly when you use a custom domain.
+      - key: PUBLIC_BASE_URL
+        sync: false
+      - key: SERVER_SECRET
+        generateValue: true
+      - key: AGENT_ACCOUNTS
+        sync: false
+      - key: DATABASE_PATH
+        value: /var/data/remote-support.sqlite
+      # Render terminates TLS (Cloudflare + Render load balancer). Cloudflare's
+      # CF-Connecting-IP carries the real client IP for rate limiting and audit hashes.
+      - key: TRUST_PROXY
+        value: "1"
+      - key: CLIENT_IP_HEADER
+        value: cf-connecting-ip
+      # Leave empty to allow all public Genesys Cloud regions (see README, sovereign clouds).
+      - key: GC_ALLOWED_HOST_ORIGINS
+        sync: false
+      - key: FRAME_ANCESTORS_EXTRA
+        sync: false
+      # TURN (see README chapter "TURN"). TURN_URLS e.g.
+      # turn:turn.example.com:3478?transport=udp,turn:turn.example.com:3478?transport=tcp,turns:turn.example.com:5349?transport=tcp
+      - key: TURN_URLS
+        sync: false
+      - key: TURN_SECRET
+        sync: false
+      - key: ICE_TRANSPORT_POLICY
+        value: all
+      - key: DEMO_ENABLED
+        value: "true"
+      - key: SESSION_END_WEBHOOK_URL
+        sync: false
+      - key: SESSION_END_WEBHOOK_SECRET
+        sync: false
